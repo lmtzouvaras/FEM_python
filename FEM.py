@@ -4,10 +4,14 @@ Spyder Editor
 
 This is a temporary script file.
 """
+
 import numpy as np
 import matplotlib.pyplot as plt
 
 class FEM_1D:
+    
+    import numpy as np
+    import matplotlib.pyplot as plt
     
     def __init__(self, domain, nex, interp='linear'):
         
@@ -67,7 +71,6 @@ class FEM_1D:
         if values[-1]!=None:
             self.robc.append([self.nnx-1, values[-1]])
     
-    
     def plotmesh(self):
 
         plt.scatter(self.nodes, np.zeros(len(self.nodes)), color='blue')
@@ -107,8 +110,6 @@ class FEM_1D:
                              x**3 -2.*x**2 +x ,
                              -2.*x**3 +3.*x**2 ,
                              x**3 -x**2])
-        
-        
     
     def phd(self, x):
         
@@ -207,9 +208,7 @@ class FEM_1D:
                                    +a0*w[p]*x1*ph[m]*ph[n])
                     
                 self.b[m1]=(self.b[m1]
-                               -c*w[p]*x1*ph[m])
-        
-        
+                               -c*w[p]*x1*ph[m])    
     
     def axb(self, ngp=None):
         
@@ -261,9 +260,6 @@ class FEM_1D:
                 self.A[node,node]=self.A[node,node] + a2 * rob1
                 self.b[node]=self.b[node] - a2 * rob0
             
-        
-        
-            
     def solve(self, ngp=None):
         
         try:
@@ -276,8 +272,45 @@ class FEM_1D:
             
             sol = np.linalg.solve(self.A, self.b)
             
-            
+        self.solution=sol
+        
         return sol
+    
+    def dsol_dx(self):
+        
+        try:
+            
+            return self.sol_deriv
+        
+        except:
+            
+            der=np.zeros_like(self.solution)
+            
+            for nel in range(len(self.elements)):
+                
+                for n in range(self.nn_el):
+                    xloc=self.nodes[self.nop(n, nel)]-self.nodes[self.nop(0, nel)]
+                    xloc=xloc/(self.nodes[self.nop((self.nn_el-1), nel)]-self.nodes[self.nop(0, nel)])
+                    phd=self.phd(xloc) 
+                    x1=0
+                    
+                    for k in range(self.nn_el):
+                        
+                        x1=x1+self.nodes[self.nop(k,nel)]*phd[k] # dx / dξ
+                    
+                    phx = phd/x1
+                    
+                    for m in range(self.nn_el):
+                        
+                        der[self.nop(n, nel)] += self.solution[self.nop(m, nel)] * phx[m]
+            
+            for nel in range(len(self.elements)-1):
+                
+                der[self.nop(self.nn_el-1, nel)] = der[self.nop(self.nn_el-1, nel)]/2
+            
+            self.sol_deriv=der
+            
+            return der
     
     def reset(self):
         
@@ -287,6 +320,9 @@ class FEM_1D:
         
         self.A=np.zeros((self.nnx,self.nnx))
         self.b=np.zeros(self.nnx)
+        
+        del self.solution
+        del self.sol_deriv
         
     def refine(self, r):
         
@@ -305,17 +341,30 @@ class FEM_1D:
     
 class FEM_2D:
     
-     
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
     def __init__(self, domain, ne, interp='linear'):
         
-        self.nn_el=4
+        self.interp=interp
+        
+        if interp=='linear':
+            self.nn_el=2
+        elif interp=='quadratic':
+            self.nn_el=3
+        elif interp=='cubic':
+            self.nn_el=5
+
         self.domain=domain
         self.xdomain=domain[0]
         self.ydomain=domain[1]
+        
+        self.ne=ne[0]*ne[1]
         self.nex=ne[0]
+        self.nnx=(self.nn_el-1)*self.nex+1
         self.ney=ne[1]
-        self.nnx=self.nex+1
-        self.nny=self.ney+1     
+        self.nny=(self.nn_el-1)*self.ney+1
+        
         self.xnodes=np.linspace(self.xdomain[0], self.xdomain[1], num=self.nnx)
         self.ynodes=np.linspace(self.ydomain[0], self.ydomain[1], num=self.nny)
         self.nodes=np.meshgrid(self.xnodes, self.ynodes)
@@ -323,70 +372,46 @@ class FEM_2D:
         self.nodes=self.nodes[self.nodes[:,1].argsort(kind='mergesort')]
         self.nodes=self.nodes[self.nodes[:,0].argsort(kind='mergesort')]
         self.elements=[]
+        
         for i in range(self.nex):
             for j in range(self.ney):
-                self.elements.append((i*self.nny+j,
-                                      i*self.nny+j+1,
-                                      (i+1)*self.nny+j,
-                                      (i+1)*self.nny+j+1))
+                temp=[]
+                for ii in range(self.nn_el):
+                    for jj in range(self.nn_el):
+                        pass
+                        temp.append(i*self.nny*(self.nn_el-1) 
+                                    + j*(self.nn_el-1) 
+                                    + ii*self.nny
+                                    + jj)
+                    
+                
+                self.elements.append(tuple(temp))
+                
         self.dirbc=[]
         self.neubc=[]
+        self.robc=[]
     
-             
+    def eq_param(self, parameters):
+        
+        self.par=parameters          # u0 , u , du/dx , d2u/dx2, du/dy, d2u/dy2
+    
     def nop(self, ln, el):
         
         return self.elements[el][ln]
         
-    def dir_node(self, node, value):
-        
-        self.dirbc.append([node, value])
-        
-    
     def plotmesh(self):
     
-        plt.scatter(self.nodes[:,0], self.nodes[:,1])
+        plt.scatter(self.nodes[:,0], self.nodes[:,1], color='blue')
         
         if len(self.dirbc)>0:
             plt.scatter(self.nodes[np.array(self.dirbc)[:,0],0], self.nodes[np.array(self.dirbc)[:,0],1], color='red')
+        
+        if len(self.neubc)>0:
+            plt.scatter(self.nodes[np.array(self.neubc)[:,0],0], self.nodes[np.array(self.neubc)[:,0],1], color='red')
+        
+        if len(self.robc)>0:
+            for n, val in self.robc:
+
+                plt.scatter(self.nodes[n,0], self.nodes[n,1], color='orange')
+                
         plt.show()
-  
-
-
-# # test2=FEM_2D(((0,10),(0,5)), (11,6))
-
-# # test2.plotmesh()
-
-# # test2.dir_node(11, 0)
-# # test2.dir_node(12, 0)
-
-# # test2.plotmesh()
-
-# test=FEM_1D((0,10), 11, interp='quadratic')
-
-# #test.plotmesh()
-
-# c=0.
-# a0=-1.
-# a1=0.
-# a2=1.
-
-# parameters = [c, a0, a1, a2]  # u0 , u , du/dx , d2u/dx2
-
-# # test.dir_node(0, 1)
-# # test.dir_node(test.nnx-1, 0)
-
-# test.dir_cond((1,0))
-
-
-# test.eq_param(parameters)
-# #test.axb()
-
-# u = test.solve()
-
-# test.plotmesh()
-# plt.show()
-
-# plt.plot(test.nodes, u)
-# plt.show()
-
-
