@@ -398,20 +398,128 @@ class FEM_2D:
     def nop(self, ln, el):
         
         return self.elements[el][ln]
-        
-    def plotmesh(self):
     
-        plt.scatter(self.nodes[:,0], self.nodes[:,1], color='blue')
+    def dir_node(self, node, value):
         
-        if len(self.dirbc)>0:
-            plt.scatter(self.nodes[np.array(self.dirbc)[:,0],0], self.nodes[np.array(self.dirbc)[:,0],1], color='red')
+        self.dirbc.append([node, value])
+        
+    def neu_node(self, node, value):
+        
+        self.neubc.append([node, value])
+    
+    def rob_node(self, node, value):
+        
+        self.robc.append([node, value])
+        
+    def dir_cond(self, position=(None,None), value=None):
+        
+        if (position[0]!=None and position[1]!=None):
+            for i in range(len(self.nodes)):
+                if (self.nodes[i][0]==position[0] and self.nodes[i][1]==position[1]):
+                    self.dir_node(i, value)
+                    
+        elif (position[0]!=None and position[1]==None):
+            for i in range(len(self.nodes)):
+                if self.nodes[i][0]==position[0]:
+                    self.dir_node(i, value)
+                    
+        elif (position[0]==None and position[1]!=None):
+            for i in range(len(self.nodes)):
+                if self.nodes[i][1]==position[1]:
+                    self.dir_node(i, value)
+            
+    def neu_cond(self, position=(None,None), value=None):
+        
+        if (position[0]!=None and position[1]!=None):
+            for i in range(len(self.nodes)):
+                if (self.nodes[i][0]==position[0] and self.nodes[i][1]==position[1]):
+                    self.neu_node(i, value)
+                    
+        elif (position[0]!=None and position[1]==None):
+            for i in range(len(self.nodes)):
+                if self.nodes[i][0]==position[0]:
+                    self.neu_node(i, value)
+                    
+        elif (position[0]==None and position[1]!=None):
+            for i in range(len(self.nodes)):
+                if self.nodes[i][1]==position[1]:
+                    self.neu_node(i, value)
+            
+    def rob_cond(self, position=(None,None), value=None):
+        
+        if (position[0]!=None and position[1]!=None):
+            for i in range(len(self.nodes)):
+                if (self.nodes[i][0]==position[0] and self.nodes[i][1]==position[1]):
+                    self.rob_node(i, value)
+                    
+        elif (position[0]!=None and position[1]==None):
+            for i in range(len(self.nodes)):
+                if self.nodes[i][0]==position[0]:
+                    self.rob_node(i, value)
+                    
+        elif (position[0]==None and position[1]!=None):
+            for i in range(len(self.nodes)):
+                if self.nodes[i][1]==position[1]:
+                    self.rob_node(i, value)
+    
+    def trap_trfm(self, vector, ub, db):
+        
+        height=self.ydomain[-1]
+        in_width=self.xdomain[-1]
+        
+        sc_ub=(ub[1]-ub[0])/in_width
+        sc_db=(db[1]-db[0])/in_width
+        
+        def K(vector):
+            
+            tr = np.array([[sc_ub*vector[1]/height + sc_db*(1-vector[1]/height), 0.],
+                             [0.                                    , 1.]])
+            
+            return tr
+        
+        return K(vector).dot(vector) + np.array([ub[0]*vector[1]/height + db[0]*(1-vector[1]/height), 0.])    
+    
+    def to_trapezoid(self, ub, db=None):
+        
+        if db==None:
+            db=self.xdomain[1]*np.array([0.0, 1.])
+        
+        for i in range(len(self.nodes)):
+            
+            self.nodes[i]=self.trap_trfm(self.nodes[i], ub, db)
+    
+    def plotmesh(self, show_elements=False, grid=False):
+    
+        plt.scatter(self.nodes[:,0], self.nodes[:,1], color='blue', label='No BC',zorder=5)
+        
+        if show_elements==True:
+            for nel in range(len(self.elements)):
+                bnodes = [self.nop(0, nel),
+                          self.nop(self.nn_el-1, nel),
+                          self.nop(self.nn_el*self.nn_el-1, nel),
+                          self.nop(2*self.nn_el, nel),
+                          self.nop(0, nel)]
+                x=[]
+                y=[]
+                for n in bnodes:
+                    x.append(self.nodes[n][0])
+                    y.append(self.nodes[n][1])
+                plt.plot(x, y, color='black',zorder=0)
+        
+        #   Color BC
         
         if len(self.neubc)>0:
-            plt.scatter(self.nodes[np.array(self.neubc)[:,0],0], self.nodes[np.array(self.neubc)[:,0],1], color='red')
+            plt.scatter(self.nodes[np.array(self.neubc, dtype=int)[:,0]][:,0], self.nodes[np.array(self.neubc, dtype=int)[:,0]][:,1], color='yellow', label='Neumann',zorder=10)
         
         if len(self.robc)>0:
             for n, val in self.robc:
 
-                plt.scatter(self.nodes[n,0], self.nodes[n,1], color='orange')
-                
+                plt.scatter(self.nodes[n,0], self.nodes[n,1], color='orange',zorder=10)
+            plt.scatter(self.nodes[n,0], self.nodes[n,1], color='orange', label='Robin',zorder=10)
+        if len(self.dirbc)>0:
+            plt.scatter(self.nodes[np.array(self.dirbc, dtype=int)[:,0]][:,0], self.nodes[np.array(self.dirbc, dtype=int)[:,0]][:,1], color='red', label='Dirichlet',zorder=20)
+        
+        if grid==True:
+            plt.grid()
+        plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
         plt.show()
