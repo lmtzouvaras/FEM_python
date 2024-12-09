@@ -13,7 +13,7 @@ class FEM_1D:
     import numpy as np
     import matplotlib.pyplot as plt
     
-    def __init__(self, domain, nex, interp='linear'):
+    def __init__(self, domain, nex, interp='linear', discr='linear'):
         
         self.interp=interp
         
@@ -204,8 +204,9 @@ class FEM_1D:
                     n1=self.nop(n, nel)
                     
                     self.A[m1,n1]=(self.A[m1,n1]
-                                   +(a1-a2)*w[p]*x1*phx[m]*phx[n]
-                                   +a0*w[p]*x1*ph[m]*ph[n])
+                                   - a2*w[p]*x1*phx[m]*phx[n]
+                                   + a1*w[p]*x1*ph[m]*phx[n]
+                                   + a0*w[p]*x1*ph[m]*ph[n])
                     
                 self.b[m1]=(self.b[m1]
                                -c*w[p]*x1*ph[m])    
@@ -367,6 +368,7 @@ class FEM_2D:
         
         self.xnodes=np.linspace(self.xdomain[0], self.xdomain[1], num=self.nnx)
         self.ynodes=np.linspace(self.ydomain[0], self.ydomain[1], num=self.nny)
+            
         self.nodes=np.meshgrid(self.xnodes, self.ynodes)
         self.nodes=np.moveaxis(np.array(self.nodes), 0, self.nodes[0].ndim).reshape(-1, len(self.nodes))
         self.nodes=self.nodes[self.nodes[:,1].argsort(kind='mergesort')]
@@ -390,10 +392,19 @@ class FEM_2D:
         self.dirbc=[]
         self.neubc=[]
         self.robc=[]
+        self.left_boundary_neu=[]
+        self.right_boundary_neu=[]
+        self.upper_boundary_neu=[]
+        self.lower_boundary_neu=[]
+        self.left_boundary_rob=[]
+        self.right_boundary_rob=[]
+        self.upper_boundary_rob=[]
+        self.lower_boundary_rob=[]
+        
     
     def eq_param(self, parameters):
         
-        self.par=parameters          # u0 , u , du/dx , d2u/dx2, du/dy, d2u/dy2
+        self.par=parameters          # constant , u , du/dx , d2u/dx2, du/dy, d2u/dy2
     
     def nop(self, ln, el):
         
@@ -444,6 +455,70 @@ class FEM_2D:
             for i in range(len(self.nodes)):
                 if self.nodes[i][1]==position[1]:
                     self.neu_node(i, value)
+                    
+        for i in range(len(self.elements)):
+            
+            el=self.elements[i]
+            
+            add=False
+            for n in range(self.nn_el):
+            
+                if (el[n] in np.array(self.neubc)[:,0] and i not in self.left_boundary_neu):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                self.left_boundary_neu.append(i)
+            
+            add=False
+            for n in range(0, self.nn_el**2-self.nn_el+1, self.nn_el):  
+            
+                if (el[n] in np.array(self.neubc)[:,0] and i not in self.lower_boundary_neu):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                    self.lower_boundary_neu.append(i)
+            
+            add=False
+            for n in range(self.nn_el-1, self.nn_el**2, self.nn_el):      
+            
+                if (el[n] in np.array(self.neubc)[:,0] and i not in self.upper_boundary_neu):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                    self.upper_boundary_neu.append(i)
+            
+            add=False
+            for n in range(self.nn_el**2-self.nn_el, self.nn_el**2):     
+            
+                if (el[n] in np.array(self.neubc)[:,0] and i not in self.right_boundary_neu):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                    self.right_boundary_neu.append(i)
             
     def rob_cond(self, position=(None,None), value=None):
         
@@ -461,6 +536,70 @@ class FEM_2D:
             for i in range(len(self.nodes)):
                 if self.nodes[i][1]==position[1]:
                     self.rob_node(i, value)
+                    
+        for i in range(len(self.elements)):
+            
+            el=self.elements[i]
+            
+            add=False
+            for n in range(self.nn_el):
+            
+                if (el[n] in np.array(self.robc)[:,0] and i not in self.left_boundary_rob):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                    self.left_boundary_rob.append(i)
+            
+            add=False
+            for n in range(0, self.nn_el**2-self.nn_el+1, self.nn_el):  
+            
+                if (el[n] in np.array(self.robc)[:,0] and i not in self.lower_boundary_rob):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                    self.lower_boundary_rob.append(i)
+            
+            add=False
+            for n in range(self.nn_el-1, self.nn_el**2, self.nn_el):      
+            
+                if (el[n] in np.array(self.robc)[:,0] and i not in self.upper_boundary_rob):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                    self.upper_boundary_rob.append(i)
+            
+            add=False                    
+            for n in range(self.nn_el**2-self.nn_el, self.nn_el**2):     
+            
+                if (el[n] in np.array(self.robc)[:,0] and i not in self.right_boundary_rob):
+                    
+                    add=True
+                    
+                else:
+                    
+                    add=False
+                    break
+                    
+            if add==True:
+                    self.right_boundary_rob.append(i)     
     
     def trap_trfm(self, vector, ub, db):
         
@@ -488,6 +627,268 @@ class FEM_2D:
             
             self.nodes[i]=self.trap_trfm(self.nodes[i], ub, db)
     
+    def ph(self, x, y):
+        
+        if self.interp=='linear':
+            
+            phx = np.array([1.-x , x])
+            phy = np.array([1.-y , y])
+            
+            return np.array([phx[0]*phy[0],
+                             phx[0]*phy[1],
+                             phx[1]*phy[0],
+                             phx[0]*phy[1]])
+        
+        elif self.interp=='quadratic':
+            
+            phx = np.array([2.*x**2 -3.*x+1. ,
+                             -4.*x**2 +4.*x ,
+                             2.*x**2 -x])
+            
+            phy = np.array([2.*y**2 -3.*y+1. ,
+                             -4.*y**2 +4.*y ,
+                             2.*y**2 -y])
+            
+            return np.array([phx[0]*phy[0],
+                             phx[0]*phy[1],
+                             phx[0]*phy[2],
+                             phx[1]*phy[0],
+                             phx[1]*phy[1],
+                             phx[1]*phy[2],
+                             phx[2]*phy[0],
+                             phx[2]*phy[1],
+                             phx[2]*phy[2]])
+            
+    def dph_dx(self, x, y):
+        
+        if self.interp=='linear':
+            
+            dphx_dx = np.array([-1. , 1.])
+            
+            phy = np.array([1.-y , y])
+            
+            return np.array([dphx_dx[0]*phy[0],
+                             dphx_dx[0]*phy[1],
+                             dphx_dx[1]*phy[0],
+                             dphx_dx[0]*phy[1]])
+        
+        elif self.interp=='quadratic':
+            
+            dphx_dx = np.array([4.*x -3. ,
+                             -8.*x +4. ,
+                             4.*x -1.])
+            
+            phy = np.array([2.*y**2 -3.*y+1. ,
+                             -4.*y**2 +4.*y ,
+                             2.*y**2 -y])
+            
+            return np.array([dphx_dx[0]*phy[0],
+                             dphx_dx[0]*phy[1],
+                             dphx_dx[0]*phy[2],
+                             dphx_dx[1]*phy[0],
+                             dphx_dx[1]*phy[1],
+                             dphx_dx[1]*phy[2],
+                             dphx_dx[2]*phy[0],
+                             dphx_dx[2]*phy[1],
+                             dphx_dx[2]*phy[2]])
+        
+    def dph_dy(self, x, y):
+        
+        if self.interp=='linear':
+            
+            phx = np.array([1.-x , x])
+            
+            dphy_dy = np.array([-1. , 1.])
+            
+            return np.array([phx[0]*dphy_dy[0],
+                             phx[0]*dphy_dy[1],
+                             phx[1]*dphy_dy[0],
+                             phx[0]*dphy_dy[1]])
+        
+        elif self.interp=='quadratic':
+            
+            phx = np.array([2.*x**2 -3.*x+1. ,
+                             -4.*x**2 +4.*x ,
+                             2.*x**2 -x])
+            
+            dphy_dy = np.array([4.*y -3. ,
+                             -8.*y +4. ,
+                             4.*y -1.])
+            
+            return np.array([phx[0]*dphy_dy[0],
+                             phx[0]*dphy_dy[1],
+                             phx[0]*dphy_dy[2],
+                             phx[1]*dphy_dy[0],
+                             phx[1]*dphy_dy[1],
+                             phx[1]*dphy_dy[2],
+                             phx[2]*dphy_dy[0],
+                             phx[2]*dphy_dy[1],
+                             phx[2]*dphy_dy[2]])        
+    
+    def axb(self, ngp=None):
+        
+        self.A=np.zeros((len(self.nodes),len(self.nodes)))
+        self.b=np.zeros(len(self.nodes))
+        
+        for nel in range(len(self.elements)):
+            
+            self.abfind(nel, ngp)
+                
+        c=self.parameters[0]
+        a=self.parameters[1]
+        a1x=self.parameters[2]
+        a2x=self.parameters[3]
+        a1y=self.parameters[4]
+        a2y=self.parameters[5]
+         
+        # Neumann BC                                        # continue from here
+        
+        for node, value in self.neubc:
+            
+            if node==0:
+                pass
+                #self.b[node]=self.b[node] + a2 * value
+                
+            if node==(self.nnx-1):
+                pass
+                #self.b[node]=self.b[node] - a2 * value
+                
+        # Robin BC
+        
+        for node, values in self.robc:
+            
+            rob1, rob0 = values # Robin condition would be   du/dx = rob1 u + rob0
+            
+            if node==0:
+                pass
+                #self.A[node,node]=self.A[node,node] - a2 * rob1
+                #self.b[node]=self.b[node] + a2 * rob0
+                
+            if node==(self.nnx-1):
+                pass
+                #self.A[node,node]=self.A[node,node] + a2 * rob1
+                #self.b[node]=self.b[node] - a2 * rob0
+        
+        # Dirichlet BC
+        
+        for node, value in self.dirbc:
+            
+            self.A[node]=0.
+            
+            self.A[node, node]=1.
+            
+            self.b[node]=value
+            
+    def abfind(self, nel, ngp):
+        
+        if self.interp=='linear':
+            
+            self.ngp=1
+                   
+        elif self.interp=='quadratic':
+            
+            self.ngp=3
+        
+        elif self.interp=='cubic':
+            
+            self.ngp=5
+        
+        if ngp!=None:
+            
+            self.ngp=ngp
+            
+        if self.ngp==1:
+            
+            w=[1.]
+            gp=[0.5]
+            
+        elif self.ngp==2:
+            
+            w=[0.5, 0.5]
+            gp=[0.2115, 0.7885]
+        
+        elif self.ngp==3:
+            
+            w=[0.278, 0.4445, 0.278]
+            gp=[0.1125, 0.5, 0.8875]
+        
+        elif self.ngp==4:
+            
+            w=[0.174, 0.326, 0.326, 0.174]
+            gp=[0.0695, 0.33, 0.67, 0.9305]
+        
+        elif self.ngp==5:
+            
+            w=[0.1185, 0.2395, 0.2845, 0.2395, 0.1185]
+            gp=[0.047, 0.231, 0.5, 0.769, 0.953]
+        
+        
+        c=self.parameters[0]
+        a=self.parameters[1]
+        a1x=self.parameters[2]
+        a2x=self.parameters[3]
+        a1y=self.parameters[4]
+        a2y=self.parameters[5]
+        
+        #   loop over gauss points
+        for p in range(len(gp)):
+            
+            for q in range(len(gp)):
+                
+                ksi, ita = gp[p], gp[q]
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                #   isoparametric transformation & x, y
+                
+                x=0.
+                y=0.
+                x1=0.
+                x2=0.
+                y1=0.
+                y2=0.
+                
+                for n in range(self.nn_el*self.nn_el):
+                    
+                    x  = x  + self.nodes[self.nop(n, nel), 0] * ph[n]           # x
+                    y  = y  + self.nodes[self.nop(n, nel), 1] * ph[n]           # y
+                    x1 = x1 + self.nodes[self.nop(n, nel), 0] * dph_dksi[n]     # dx/dξ
+                    x2 = x2 + self.nodes[self.nop(n, nel), 0] * dph_dita[n]     # dx/dη
+                    y1 = y1 + self.nodes[self.nop(n, nel), 1] * dph_dksi[n]     # dy/dξ
+                    y2 = y2 + self.nodes[self.nop(n, nel), 1] * dph_dita[n]     # dy/dη
+                    
+                
+                dett = x1 * y2 - x2 * y1
+                
+                for k in range(self.nn_el*self.nn_el):
+                    
+                    dph_dx = ( y2 * dph_dksi[k] - y1 * dph_dita[k] ) / dett
+                    dph_dy = ( x1 * dph_dita[k] - y1 * dph_dksi[k] ) / dett
+                
+                #   Residuals
+                
+                for l in range(self.nn_el*self.nn_el):
+                    
+                    l1 = self.nop(l, nel)
+                    
+                    for m in range(self.nn_el*self.nn_el):
+                        
+                        m1 = self.nop(m, nel)
+                        
+                        self.A[l1,m1]=(self.A[l1,m1]
+                                       -a2x * w[p]*w[q] * dett * dph_dx[l]*dph_dx[m]
+                                       -a2y * w[p]*w[q] * dett * dph_dy[l]*dph_dy[m]
+                                       +a1x * w[p]*w[q] * dett * ph[l]*dph_dx[m]
+                                       +a1y * w[p]*w[q] * dett * ph[l]*dph_dy[m]
+                                       +a   * w[p]*w[q] * dett * ph[l]*ph[m]
+                                       )
+                        
+                    self.b[l1]=(self.b[l1]
+                                -c * w[p]*w[q] * dett * ph[l]
+                                ) 
+       
+        
     def plotmesh(self, show_elements=False, grid=False):
     
         plt.scatter(self.nodes[:,0], self.nodes[:,1], color='blue', label='No BC',zorder=5)
