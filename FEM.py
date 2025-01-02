@@ -473,7 +473,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                self.left_boundary_neu.append(i)
+                self.left_boundary_neu.append([i, value])
             
             add=False
             for n in range(0, self.nn_el**2-self.nn_el+1, self.nn_el):  
@@ -488,7 +488,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                    self.lower_boundary_neu.append(i)
+                    self.lower_boundary_neu.append([i, value])
             
             add=False
             for n in range(self.nn_el-1, self.nn_el**2, self.nn_el):      
@@ -503,7 +503,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                    self.upper_boundary_neu.append(i)
+                    self.upper_boundary_neu.append([i, value])
             
             add=False
             for n in range(self.nn_el**2-self.nn_el, self.nn_el**2):     
@@ -518,7 +518,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                    self.right_boundary_neu.append(i)
+                    self.right_boundary_neu.append([i, value])
             
     def rob_cond(self, position=(None,None), value=None):
         
@@ -554,7 +554,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                    self.left_boundary_rob.append(i)
+                    self.left_boundary_rob.append([i, value])
             
             add=False
             for n in range(0, self.nn_el**2-self.nn_el+1, self.nn_el):  
@@ -569,7 +569,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                    self.lower_boundary_rob.append(i)
+                    self.lower_boundary_rob.append([i, value])
             
             add=False
             for n in range(self.nn_el-1, self.nn_el**2, self.nn_el):      
@@ -584,7 +584,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                    self.upper_boundary_rob.append(i)
+                    self.upper_boundary_rob.append([i, value])
             
             add=False                    
             for n in range(self.nn_el**2-self.nn_el, self.nn_el**2):     
@@ -599,7 +599,7 @@ class FEM_2D:
                     break
                     
             if add==True:
-                    self.right_boundary_rob.append(i)     
+                    self.right_boundary_rob.append([i, value])     
     
     def trap_trfm(self, vector, ub, db):
         
@@ -618,6 +618,21 @@ class FEM_2D:
         
         return K(vector).dot(vector) + np.array([ub[0]*vector[1]/height + db[0]*(1-vector[1]/height), 0.])    
     
+    def dom_transf(self, in_pos, boundaries, corners):
+        
+        inx, iny = in_pos
+        xofy_bound = boundaries[0]
+        yofx_bound = boundaries[1]
+        ld, rd, ru, lu = corners
+        
+        scale_x = [rd[0]-ld[0] , ru[0]-lu[0]]
+        scale_y = [lu[1]-ld[1] , ru[1]-rd[1]]
+        
+        x = xofy_bound[0](scale_y[0]*iny) * (1.-inx) + xofy_bound[1](scale_y[1]*iny) * inx
+        y = yofx_bound[0](scale_x[0]*inx) * (1.-iny) + yofx_bound[1](scale_x[1]*inx) * iny
+        
+        return x , y
+    
     def to_trapezoid(self, ub, db=None):
         
         if db==None:
@@ -626,6 +641,12 @@ class FEM_2D:
         for i in range(len(self.nodes)):
             
             self.nodes[i]=self.trap_trfm(self.nodes[i], ub, db)
+            
+    def to_transf(self, boundaries, corners):
+        
+        for i in range(len(self.nodes)):
+            
+            self.nodes[i]=self.dom_transf(self.nodes[i], boundaries, corners)
     
     def ph(self, x, y):
         
@@ -733,7 +754,48 @@ class FEM_2D:
         for nel in range(len(self.elements)):
             
             self.abfind(nel, ngp)
-                
+        
+        if self.interp=='linear':
+            
+            self.ngp=1
+                   
+        elif self.interp=='quadratic':
+            
+            self.ngp=3
+        
+        elif self.interp=='cubic':
+            
+            self.ngp=5
+        
+        if ngp!=None:
+            
+            self.ngp=ngp
+            
+        if self.ngp==1:
+            
+            w=[1.]
+            gp=[0.5]
+            
+        elif self.ngp==2:
+            
+            w=[0.5, 0.5]
+            gp=[0.2115, 0.7885]
+        
+        elif self.ngp==3:
+            
+            w=[0.278, 0.4445, 0.278]
+            gp=[0.1125, 0.5, 0.8875]
+        
+        elif self.ngp==4:
+            
+            w=[0.174, 0.326, 0.326, 0.174]
+            gp=[0.0695, 0.33, 0.67, 0.9305]
+        
+        elif self.ngp==5:
+            
+            w=[0.1185, 0.2395, 0.2845, 0.2395, 0.1185]
+            gp=[0.047, 0.231, 0.5, 0.769, 0.953]    
+        
         c=self.parameters[0]
         a=self.parameters[1]
         a1x=self.parameters[2]
@@ -741,19 +803,116 @@ class FEM_2D:
         a1y=self.parameters[4]
         a2y=self.parameters[5]
          
-        # Neumann BC                                        # continue from here
+        # Neumann BC
         
-        for node, value in self.neubc:
+                #   left Neumann
+                
+        for element, value in self.left_boundary_neu:
             
-            if node==0:
-                pass
-                #self.b[node]=self.b[node] + a2 * value
+            for p in range(len(self.nn_el)):
                 
-            if node==(self.nnx-1):
-                pass
-                #self.b[node]=self.b[node] - a2 * value
+                ksi, ita = 0. , gp[p]
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
                 
-        # Robin BC
+                y=0.
+                x2=0.
+                y2=0.
+                
+                for n in range(len(self.nn_el*self.nn_el)):
+                    
+                    y  = y  + self.nodes[self.nop(n, element), 1] * ph[n]           # y
+                    x2 = x2 + self.nodes[self.nop(n, nel), 0] * dph_dita[n]         # dx/dη
+                    y2 = y2 + self.nodes[self.nop(n, element), 1] * dph_dita[n]     # dy/dη
+                
+                for ln in range(self.nn_el):
+                    
+                    self.b[self.nop(ln, element)] += - w[ln] * a2x * y2 * ph(ln) * value[0]
+                    
+                    self.b[self.nop(ln, element)] += w[ln] * a2y * x2 * ph(ln) * value[1]
+        
+                #   lower Neumann
+                            
+        for element, value in self.lower_boundary_neu:
+            
+            for p in range(len(self.nn_el)):
+                
+                ksi, ita = gp[p] , 0.
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                x=0.
+                x1=0.
+                y1=0.
+                
+                for n in range(len(self.nn_el*self.nn_el)):
+                    
+                    x  = x  + self.nodes[self.nop(n, element), 0] * ph[n]           # x
+                    x1 = x1 + self.nodes[self.nop(n, element), 0] * dph_dksi[n]     # dx/dξ
+                    y1 = y1 + self.nodes[self.nop(n, nel), 1]     * dph_dksi[n]     # dy/dξ
+                
+                for ln in range(0, self.nn_el*self.nn_el-self.nn_el, self.nn_el):
+                    
+                    self.b[self.nop(ln, element)] += - w[ln] * a2y * x1 * ph(ln) * value[1]
+                    
+                    self.b[self.nop(ln, element)] += - w[ln] * a2x * y1 * ph(ln) * value[0]
+        
+                #   right Neumann
+                
+        for element, value in self.right_boundary_neu:
+            
+            for p in range(len(self.nn_el)):
+                
+                ksi, ita = 1. , gp[p]
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                y=0.
+                x2=0.
+                y2=0.
+                
+                for n in range(len(self.nn_el*self.nn_el)):
+                    
+                    y  = y  + self.nodes[self.nop(n, element), 1] * ph[n]           # y
+                    x2 = x2 + self.nodes[self.nop(n, nel), 0] * dph_dita[n]         # dx/dη
+                    y2 = y2 + self.nodes[self.nop(n, element), 1] * dph_dita[n]     # dy/dη
+                
+                for ln in range(self.nn_el*self.nn_el-self.nn_el, self.nn_el*self.nn_el):
+                    
+                    self.b[self.nop(ln, element)] +=  w[ln] * a2x * y2 * ph(ln) * value[0]
+                    
+                    self.b[self.nop(ln, element)] +=  w[ln] * a2y * x2 * ph(ln) * value[1]
+        
+                #   upper Neumann
+                            
+        for element, value in self.upper_boundary_neu:
+            
+            for p in range(len(self.nn_el)):
+                
+                ksi, ita = gp[p] , 1.
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                x=0.
+                x1=0.
+                
+                for n in range(len(self.nn_el*self.nn_el)):
+                    
+                    x  = x  + self.nodes[self.nop(n, element), 0] * ph[n]           # x
+                    x1 = x1 + self.nodes[self.nop(n, element), 0] * dph_dksi[n]     # dx/dξ
+                    y1 = y1 + self.nodes[self.nop(n, nel), 1]     * dph_dksi[n]     # dy/dξ
+                
+                for ln in range(self.nn_el-1, self.nn_el*self.nn_el, self.nn_el):
+                    
+                    self.b[self.nop(ln, element)] += w[ln] * a2y * x1 * ph(ln) * value[1]
+                    
+                    self.b[self.nop(ln, element)] += w[ln] * a2x * y1 * ph(ln) * value[0]
+        
+        # Robin BC                                        # continue from here
         
         for node, values in self.robc:
             
