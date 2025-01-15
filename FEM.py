@@ -462,8 +462,11 @@ class FEM_2D:
             
             add=False
             for n in range(self.nn_el):
-            
-                if (el[n] in np.array(self.neubc)[:,0] and i not in self.left_boundary_neu):
+                
+                temp=[]
+                for row in self.neubc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.left_boundary_neu):
                     
                     add=True
                     
@@ -477,8 +480,11 @@ class FEM_2D:
             
             add=False
             for n in range(0, self.nn_el**2-self.nn_el+1, self.nn_el):  
-            
-                if (el[n] in np.array(self.neubc)[:,0] and i not in self.lower_boundary_neu):
+                
+                temp=[]
+                for row in self.neubc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.lower_boundary_neu):
                     
                     add=True
                     
@@ -492,8 +498,11 @@ class FEM_2D:
             
             add=False
             for n in range(self.nn_el-1, self.nn_el**2, self.nn_el):      
-            
-                if (el[n] in np.array(self.neubc)[:,0] and i not in self.upper_boundary_neu):
+                
+                temp=[]
+                for row in self.neubc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.upper_boundary_neu):
                     
                     add=True
                     
@@ -507,8 +516,11 @@ class FEM_2D:
             
             add=False
             for n in range(self.nn_el**2-self.nn_el, self.nn_el**2):     
-            
-                if (el[n] in np.array(self.neubc)[:,0] and i not in self.right_boundary_neu):
+                
+                temp=[]
+                for row in self.neubc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.right_boundary_neu):
                     
                     add=True
                     
@@ -543,8 +555,11 @@ class FEM_2D:
             
             add=False
             for n in range(self.nn_el):
-            
-                if (el[n] in np.array(self.robc)[:,0] and i not in self.left_boundary_rob):
+                
+                temp=[]
+                for row in self.robc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.left_boundary_rob):
                     
                     add=True
                     
@@ -558,8 +573,11 @@ class FEM_2D:
             
             add=False
             for n in range(0, self.nn_el**2-self.nn_el+1, self.nn_el):  
-            
-                if (el[n] in np.array(self.robc)[:,0] and i not in self.lower_boundary_rob):
+                
+                temp=[]
+                for row in self.robc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.lower_boundary_rob):
                     
                     add=True
                     
@@ -573,8 +591,11 @@ class FEM_2D:
             
             add=False
             for n in range(self.nn_el-1, self.nn_el**2, self.nn_el):      
-            
-                if (el[n] in np.array(self.robc)[:,0] and i not in self.upper_boundary_rob):
+                
+                temp=[]
+                for row in self.robc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.upper_boundary_rob):
                     
                     add=True
                     
@@ -588,8 +609,11 @@ class FEM_2D:
             
             add=False                    
             for n in range(self.nn_el**2-self.nn_el, self.nn_el**2):     
-            
-                if (el[n] in np.array(self.robc)[:,0] and i not in self.right_boundary_rob):
+                
+                temp=[]
+                for row in self.robc:
+                    temp.append(row[0])
+                if (el[n] in temp) and (i not in self.right_boundary_rob):
                     
                     add=True
                     
@@ -647,6 +671,12 @@ class FEM_2D:
         for i in range(len(self.nodes)):
             
             self.nodes[i]=self.dom_transf(self.nodes[i], boundaries, corners)
+            
+    def move(self, vector):
+        
+        for i in range(len(self.nodes)):
+            
+            self.nodes[i]+=np.array(vector)
     
     def ph(self, x, y):
         
@@ -796,12 +826,12 @@ class FEM_2D:
             w=[0.1185, 0.2395, 0.2845, 0.2395, 0.1185]
             gp=[0.047, 0.231, 0.5, 0.769, 0.953]    
         
-        c=self.parameters[0]
-        a=self.parameters[1]
-        a1x=self.parameters[2]
-        a2x=self.parameters[3]
-        a1y=self.parameters[4]
-        a2y=self.parameters[5]
+        c=self.par[0]
+        a=self.par[1]
+        a1x=self.par[2]
+        a2x=self.par[3]
+        a1y=self.par[4]
+        a2y=self.par[5]
          
         # Neumann BC
         
@@ -809,7 +839,7 @@ class FEM_2D:
                 
         for element, value in self.left_boundary_neu:
             
-            for p in range(len(self.nn_el)):
+            for p in range(self.nn_el):
                 
                 ksi, ita = 0. , gp[p]
                 ph = self.ph(ksi, ita)
@@ -820,23 +850,36 @@ class FEM_2D:
                 x2=0.
                 y2=0.
                 
-                for n in range(len(self.nn_el*self.nn_el)):
+                
+                for n in range(self.nn_el*self.nn_el):
                     
                     y  = y  + self.nodes[self.nop(n, element), 1] * ph[n]           # y
                     x2 = x2 + self.nodes[self.nop(n, nel), 0] * dph_dita[n]         # dx/dη
                     y2 = y2 + self.nodes[self.nop(n, element), 1] * dph_dita[n]     # dy/dη
                 
+                if value[1]=='n_in':
+                    
+                    tot=value[0]
+                    value[0] = tot * y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    value[1] = tot * -x2/np.sqrt(x2**2+y2**2)   # value in y direction
+                    
+                if value[1]=='n_out':
+                    
+                    tot=value[0]
+                    value[0] = tot * -y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    value[1] = tot * x2/np.sqrt(x2**2+y2**2)     # value in y direction
+                
                 for ln in range(self.nn_el):
                     
-                    self.b[self.nop(ln, element)] += - w[ln] * a2x * y2 * ph(ln) * value[0]
+                    self.b[self.nop(ln, element)] += + w[p] * a2x * y2 * ph[ln] * value[0]
                     
-                    self.b[self.nop(ln, element)] += w[ln] * a2y * x2 * ph(ln) * value[1]
+                    self.b[self.nop(ln, element)] += - w[p] * a2y * x2 * ph[ln] * value[1]
         
                 #   lower Neumann
                             
         for element, value in self.lower_boundary_neu:
             
-            for p in range(len(self.nn_el)):
+            for p in range(self.nn_el):
                 
                 ksi, ita = gp[p] , 0.
                 ph = self.ph(ksi, ita)
@@ -847,23 +890,35 @@ class FEM_2D:
                 x1=0.
                 y1=0.
                 
-                for n in range(len(self.nn_el*self.nn_el)):
+                for n in range(self.nn_el*self.nn_el):
                     
                     x  = x  + self.nodes[self.nop(n, element), 0] * ph[n]           # x
                     x1 = x1 + self.nodes[self.nop(n, element), 0] * dph_dksi[n]     # dx/dξ
                     y1 = y1 + self.nodes[self.nop(n, nel), 1]     * dph_dksi[n]     # dy/dξ
                 
+                if value[1]=='n_in':
+                    
+                    tot=value[0]
+                    value[0] = tot * -y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    value[1] = tot * x1/np.sqrt(x1**2+y1**2)     # value in y direction
+                    
+                if value[1]=='n_out':
+                    
+                    tot=value[0]
+                    value[0] = tot * y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    value[1] = tot * -x1/np.sqrt(x1**2+y1**2)   # value in y direction
+                
                 for ln in range(0, self.nn_el*self.nn_el-self.nn_el, self.nn_el):
                     
-                    self.b[self.nop(ln, element)] += - w[ln] * a2y * x1 * ph(ln) * value[1]
+                    self.b[self.nop(ln, element)] += - w[p] * a2y * x1 * ph[ln] * value[1]
                     
-                    self.b[self.nop(ln, element)] += - w[ln] * a2x * y1 * ph(ln) * value[0]
+                    self.b[self.nop(ln, element)] += + w[p] * a2x * y1 * ph[ln] * value[0]
         
                 #   right Neumann
                 
         for element, value in self.right_boundary_neu:
             
-            for p in range(len(self.nn_el)):
+            for p in range(self.nn_el):
                 
                 ksi, ita = 1. , gp[p]
                 ph = self.ph(ksi, ita)
@@ -874,23 +929,35 @@ class FEM_2D:
                 x2=0.
                 y2=0.
                 
-                for n in range(len(self.nn_el*self.nn_el)):
+                for n in range(self.nn_el*self.nn_el):
                     
                     y  = y  + self.nodes[self.nop(n, element), 1] * ph[n]           # y
                     x2 = x2 + self.nodes[self.nop(n, nel), 0] * dph_dita[n]         # dx/dη
                     y2 = y2 + self.nodes[self.nop(n, element), 1] * dph_dita[n]     # dy/dη
                 
+                if value[1]=='n_in':
+                    
+                    tot=value[0]
+                    value[0] = tot * -y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    value[1] = tot * x2/np.sqrt(x2**2+y2**2)     # value in y direction
+                    
+                if value[1]=='n_out':
+                    
+                    tot=value[0]
+                    value[0] = tot * y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    value[1] = tot * -x2/np.sqrt(x2**2+y2**2)   # value in y direction
+                
                 for ln in range(self.nn_el*self.nn_el-self.nn_el, self.nn_el*self.nn_el):
+
+                    self.b[self.nop(ln, element)] +=  - w[p] * a2x * y2 * ph[ln] * value[0]
                     
-                    self.b[self.nop(ln, element)] +=  w[ln] * a2x * y2 * ph(ln) * value[0]
-                    
-                    self.b[self.nop(ln, element)] +=  w[ln] * a2y * x2 * ph(ln) * value[1]
+                    self.b[self.nop(ln, element)] +=  + w[p] * a2y * x2 * ph[ln] * value[1]
         
                 #   upper Neumann
                             
         for element, value in self.upper_boundary_neu:
             
-            for p in range(len(self.nn_el)):
+            for p in range(self.nn_el):
                 
                 ksi, ita = gp[p] , 1.
                 ph = self.ph(ksi, ita)
@@ -899,34 +966,224 @@ class FEM_2D:
                 
                 x=0.
                 x1=0.
+                y1=0.
                 
-                for n in range(len(self.nn_el*self.nn_el)):
+                for n in range(self.nn_el*self.nn_el):
                     
                     x  = x  + self.nodes[self.nop(n, element), 0] * ph[n]           # x
                     x1 = x1 + self.nodes[self.nop(n, element), 0] * dph_dksi[n]     # dx/dξ
                     y1 = y1 + self.nodes[self.nop(n, nel), 1]     * dph_dksi[n]     # dy/dξ
                 
+                if value[1]=='n_in':
+                    
+                    tot=value[0]
+                    value[0] = tot * y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    value[1] = tot * -x1/np.sqrt(x1**2+y1**2)   # value in y direction
+                    
+                if value[1]=='n_out':
+                    
+                    tot=value[0]
+                    value[0] = tot * -y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    value[1] = tot * x1/np.sqrt(x1**2+y1**2)     # value in y direction
+                
                 for ln in range(self.nn_el-1, self.nn_el*self.nn_el, self.nn_el):
                     
-                    self.b[self.nop(ln, element)] += w[ln] * a2y * x1 * ph(ln) * value[1]
+                    self.b[self.nop(ln, element)] += + w[p] * a2y * x1 * ph[ln] * value[1]
                     
-                    self.b[self.nop(ln, element)] += w[ln] * a2x * y1 * ph(ln) * value[0]
+                    self.b[self.nop(ln, element)] += - w[p] * a2x * y1 * ph[ln] * value[0]
         
         # Robin BC                                        # continue from here
-        
-        for node, values in self.robc:
-            
-            rob1, rob0 = values # Robin condition would be   du/dx = rob1 u + rob0
-            
-            if node==0:
-                pass
-                #self.A[node,node]=self.A[node,node] - a2 * rob1
-                #self.b[node]=self.b[node] + a2 * rob0
+
+                #   left Robin
                 
-            if node==(self.nnx-1):
-                pass
-                #self.A[node,node]=self.A[node,node] + a2 * rob1
-                #self.b[node]=self.b[node] - a2 * rob0
+        for element, value in self.left_boundary_rob:
+            
+            for p in range(self.nn_el):
+                
+                ksi, ita = 0. , gp[p]
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                y=0.
+                x2=0.
+                y2=0.
+                
+                
+                for n in range(self.nn_el*self.nn_el):
+                    
+                    y  = y  + self.nodes[self.nop(n, element), 1] * ph[n]           # y
+                    x2 = x2 + self.nodes[self.nop(n, nel), 0] * dph_dita[n]         # dx/dη
+                    y2 = y2 + self.nodes[self.nop(n, element), 1] * dph_dita[n]     # dy/dη
+                
+                if value[2]=='n_in':
+                    
+                    rob1=value[0]     # Robin condition would be   du/dx = rob1 u + rob0
+                    rob0=value[1]
+                    xdir = y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    ydir = -x2/np.sqrt(x2**2+y2**2)   # value in y direction
+                    
+                if value[2]=='n_out':
+                    
+                    rob1=value[0]
+                    rob0=value[1]
+                    xdir = -y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    ydir = x2/np.sqrt(x2**2+y2**2)     # value in y direction
+                
+                for ln in range(self.nn_el):
+                    
+                    self.b[self.nop(ln, element)] += + w[p] * a2x * y2 * ph[ln] * rob0*xdir
+                    
+                    self.b[self.nop(ln, element)] += - w[p] * a2y * x2 * ph[ln] * rob0*ydir
+                    
+                    for m in range(self.nn_el*self.nn_el):
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= - w[p] * a2x * y2 * ph[ln]*ph[m] * rob1*xdir
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= + w[p] * a2y * x2 * ph[ln]*ph[m] * rob1*ydir                  
+        
+                #   lower Robin
+                            
+        for element, value in self.lower_boundary_rob:
+            
+            for p in range(self.nn_el):
+                
+                ksi, ita = gp[p] , 0.
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                x=0.
+                x1=0.
+                y1=0.
+                
+                for n in range(self.nn_el*self.nn_el):
+                    
+                    x  = x  + self.nodes[self.nop(n, element), 0] * ph[n]           # x
+                    x1 = x1 + self.nodes[self.nop(n, element), 0] * dph_dksi[n]     # dx/dξ
+                    y1 = y1 + self.nodes[self.nop(n, nel), 1]     * dph_dksi[n]     # dy/dξ
+                
+                if value[2]=='n_in':
+                    
+                    rob1=value[0]
+                    rob0=value[1]
+                    xdir = -y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    ydir = x1/np.sqrt(x1**2+y1**2)     # value in y direction
+                    
+                if value[2]=='n_out':
+                    
+                    rob1=value[0]
+                    rob0=value[1]
+                    xdir = y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    ydir = -x1/np.sqrt(x1**2+y1**2)   # value in y direction
+                
+                for ln in range(0, self.nn_el*self.nn_el-self.nn_el, self.nn_el):
+                    
+                    self.b[self.nop(ln, element)] += + w[p] * a2y * x1 * ph[ln] * rob0*ydir
+                    
+                    self.b[self.nop(ln, element)] += - w[p] * a2x * y1 * ph[ln] * rob0*xdir
+                    
+                    for m in range(self.nn_el*self.nn_el):
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= - w[p] * a2y * x1 * ph[ln]*ph[m] * rob1*ydir
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= + w[p] * a2x * y1 * ph[ln]*ph[m] * rob1*xdir           
+        
+                #   right Robin
+                
+        for element, value in self.right_boundary_rob:
+            
+            for p in range(self.nn_el):
+                
+                ksi, ita = 1. , gp[p]
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                y=0.
+                x2=0.
+                y2=0.
+                
+                for n in range(self.nn_el*self.nn_el):
+                    
+                    y  = y  + self.nodes[self.nop(n, element), 1] * ph[n]           # y
+                    x2 = x2 + self.nodes[self.nop(n, nel), 0] * dph_dita[n]         # dx/dη
+                    y2 = y2 + self.nodes[self.nop(n, element), 1] * dph_dita[n]     # dy/dη
+                
+                if value[2]=='n_in':
+                    
+                    rob1=value[0]
+                    rob0=value[1]
+                    xdir = -y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    ydir = x2/np.sqrt(x2**2+y2**2)     # value in y direction
+                    
+                if value[2]=='n_out':
+                    
+                    rob1=value[0]
+                    rob0=value[1]
+                    xdir = y2/np.sqrt(x2**2+y2**2)    # value in x direction
+                    ydir = -x2/np.sqrt(x2**2+y2**2)   # value in y direction
+                
+                for ln in range(self.nn_el*self.nn_el-self.nn_el, self.nn_el*self.nn_el):        
+                    
+                    self.b[self.nop(ln, element)] +=  - w[p] * a2x * y2 * ph[ln] * rob0*xdir
+                    
+                    self.b[self.nop(ln, element)] +=  + w[p] * a2y * x2 * ph[ln] * rob0*ydir
+                    
+                    for m in range(self.nn_el*self.nn_el):
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= + w[p] * a2x * y2 * ph[ln]*ph[m] * rob1*xdir
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= - w[p] * a2y * x2 * ph[ln]*ph[m] * rob1*ydir
+        
+                #   upper Robin
+                            
+        for element, value in self.upper_boundary_rob:
+            
+            for p in range(self.nn_el):
+                
+                ksi, ita = gp[p] , 1.
+                ph = self.ph(ksi, ita)
+                dph_dksi = self.dph_dx(ksi, ita)
+                dph_dita = self.dph_dy(ksi, ita)
+                
+                x=0.
+                x1=0.
+                y1=0.
+                
+                for n in range(self.nn_el*self.nn_el):
+                    
+                    x  = x  + self.nodes[self.nop(n, element), 0] * ph[n]           # x
+                    x1 = x1 + self.nodes[self.nop(n, element), 0] * dph_dksi[n]     # dx/dξ
+                    y1 = y1 + self.nodes[self.nop(n, nel), 1]     * dph_dksi[n]     # dy/dξ
+                
+                if value[2]=='n_in':
+                    
+                    rob1=value[0]
+                    rob0=value[1]
+                    xdir = y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    ydir = -x1/np.sqrt(x1**2+y1**2)   # value in y direction
+                    
+                if value[2]=='n_out':
+                    
+                    rob1=value[0]
+                    rob0=value[1]
+                    xdir = -y1/np.sqrt(x1**2+y1**2)    # value in x direction
+                    ydir = x1/np.sqrt(x1**2+y1**2)     # value in y direction
+                
+                for ln in range(self.nn_el-1, self.nn_el*self.nn_el, self.nn_el):
+                    
+                    self.b[self.nop(ln, element)] += - w[p] * a2y * x1 * ph[ln] * rob0*ydir
+                    
+                    self.b[self.nop(ln, element)] += + w[p] * a2x * y1 * ph[ln] * rob0*xdir
+                    
+                    for m in range(self.nn_el*self.nn_el):
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= + w[p] * a2y * x1 * ph[ln]*ph[m] * rob1*ydir
+                        
+                        self.A[self.nop(ln, element), self.nop(m, element)]+= - w[p] * a2x * y1 * ph[ln]*ph[m] * rob1*xdir
+        
+        
         
         # Dirichlet BC
         
@@ -982,12 +1239,12 @@ class FEM_2D:
             gp=[0.047, 0.231, 0.5, 0.769, 0.953]
         
         
-        c=self.parameters[0]
-        a=self.parameters[1]
-        a1x=self.parameters[2]
-        a2x=self.parameters[3]
-        a1y=self.parameters[4]
-        a2y=self.parameters[5]
+        c=self.par[0]
+        a=self.par[1]
+        a1x=self.par[2]
+        a2x=self.par[3]
+        a1y=self.par[4]
+        a2y=self.par[5]
         
         #   loop over gauss points
         for p in range(len(gp)):
@@ -1020,10 +1277,13 @@ class FEM_2D:
                 
                 dett = x1 * y2 - x2 * y1
                 
+                dph_dx = np.zeros(self.nn_el*self.nn_el)
+                dph_dy = np.zeros(self.nn_el*self.nn_el)
+                
                 for k in range(self.nn_el*self.nn_el):
                     
-                    dph_dx = ( y2 * dph_dksi[k] - y1 * dph_dita[k] ) / dett
-                    dph_dy = ( x1 * dph_dita[k] - y1 * dph_dksi[k] ) / dett
+                    dph_dx[k] = ( y2 * dph_dksi[k] - y1 * dph_dita[k] ) / dett
+                    dph_dy[k] = ( x1 * dph_dita[k] - y1 * dph_dksi[k] ) / dett
                 
                 #   Residuals
                 
@@ -1036,18 +1296,33 @@ class FEM_2D:
                         m1 = self.nop(m, nel)
                         
                         self.A[l1,m1]=(self.A[l1,m1]
-                                       -a2x * w[p]*w[q] * dett * dph_dx[l]*dph_dx[m]
-                                       -a2y * w[p]*w[q] * dett * dph_dy[l]*dph_dy[m]
-                                       +a1x * w[p]*w[q] * dett * ph[l]*dph_dx[m]
-                                       +a1y * w[p]*w[q] * dett * ph[l]*dph_dy[m]
-                                       +a   * w[p]*w[q] * dett * ph[l]*ph[m]
+                                       -a2x      * w[p]*w[q] * dett * dph_dx[l]*dph_dx[m]
+                                       -a2y      * w[p]*w[q] * dett * dph_dy[l]*dph_dy[m]
+                                       +a1x(x,y) * w[p]*w[q] * dett * ph[l]*dph_dx[m]
+                                       +a1y(x,y) * w[p]*w[q] * dett * ph[l]*dph_dy[m]
+                                       +a        * w[p]*w[q] * dett * ph[l]*ph[m]
                                        )
                         
                     self.b[l1]=(self.b[l1]
                                 -c * w[p]*w[q] * dett * ph[l]
                                 ) 
        
+    def solve(self, ngp=None):
         
+        try:
+            
+            sol = np.linalg.solve(self.A, self.b)
+            
+        except:
+            
+            self.axb(ngp)
+            
+            sol = np.linalg.solve(self.A, self.b)
+            
+        self.solution=sol
+        
+        return sol
+    
     def plotmesh(self, show_elements=False, grid=False):
     
         plt.scatter(self.nodes[:,0], self.nodes[:,1], color='blue', label='No BC',zorder=5)
@@ -1069,7 +1344,10 @@ class FEM_2D:
         #   Color BC
         
         if len(self.neubc)>0:
-            plt.scatter(self.nodes[np.array(self.neubc, dtype=int)[:,0]][:,0], self.nodes[np.array(self.neubc, dtype=int)[:,0]][:,1], color='yellow', label='Neumann',zorder=10)
+            temp=[]
+            for row in self.neubc:
+                temp.append(row[0])
+            plt.scatter(self.nodes[np.array(temp, dtype=int)][:,0], self.nodes[np.array(temp, dtype=int)][:,1], color='yellow', label='Neumann',zorder=10)
         
         if len(self.robc)>0:
             for n, val in self.robc:
@@ -1082,4 +1360,33 @@ class FEM_2D:
         if grid==True:
             plt.grid()
         plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
+        plt.show()
+
+    def plot_cont(self, xlabel, ylabel, zlabel, title, levels):
+        
+        from scipy.interpolate import griddata
+        from scipy.spatial import Delaunay
+        
+        x = self.nodes[:,0]
+        y = self.nodes[:,1]
+        z = self.solution
+        
+        xi = np.linspace(min(x), max(x), 100)  
+        yi = np.linspace(min(y), max(y), 100)  
+        X, Y = np.meshgrid(xi, yi)             
+        
+        Z = griddata((x, y), z, (X, Y), method='cubic')
+        
+        # Plot the contour
+        plt.figure(figsize=(12, 6))
+        contour = plt.contourf(X, Y, Z, levels=levels, cmap='viridis')  # Contour lines
+        plt.clabel(contour, inline=True, fontsize=8)               # Label the contours
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        
+        # Add a color bar
+        plt.colorbar(contour, label=zlabel)
+        
+        # Show the plot
         plt.show()
