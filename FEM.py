@@ -1390,3 +1390,380 @@ class FEM_2D:
         
         # Show the plot
         plt.show()
+        
+class FEM_1D_nl:
+    
+    #import numpy as np
+    import matplotlib.pyplot as plt
+    import autograd.numpy as np
+    from autograd import grad
+    
+    def __init__(self, domain, nex, interp='linear', discr='linear'):
+        
+        self.interp=interp
+        
+        if interp=='linear':
+            self.nn_el=2
+        elif interp=='quadratic':
+            self.nn_el=3
+        elif interp=='cubic':
+            self.nn_el=5
+
+        self.domain=domain
+        self.nex=nex
+        self.nnx=(self.nn_el-1)*self.nex+1
+        self.nodes=np.linspace(domain[0], domain[1], num=(self.nnx))
+        self.elements=[]
+        for i in range(self.nex):
+            temp=[]
+            for j in range(self.nn_el):
+                temp.append(i*(self.nn_el-1)+j)              
+            self.elements.append(tuple(temp))
+        self.dirbc=[]
+        self.neubc=[]
+        self.robc=[]
+        
+        self.soltest=np.zeros(self.nnx)
+        #self.soltest=np.ones(self.nnx)
+        #self.soltest=np.random.rand(self.nnx)
+        
+        self.intest=np.copy(self.soltest)
+        
+    def eq_param(self, parameters):
+        
+        self.par=parameters          # multiplier of d2u/dx2 , multiplier of du/dx , f(u)
+    
+    def nop(self, ln, el):
+        
+        return self.elements[el][ln]
+    
+    def dir_node(self, node, value):
+        
+        self.dirbc.append([node, value])
+        
+    def dir_cond(self, values=(None,None)):
+        
+        if values[0]!=None:
+            self.dirbc.append([0, values[0]])
+        if values[-1]!=None:
+            self.dirbc.append([self.nnx-1, values[-1]])
+        
+    def neu_cond(self, values=(None,None)):
+        
+        if values[0]!=None:
+            self.neubc.append([0, values[0]])
+        if values[-1]!=None:
+            self.neubc.append([self.nnx-1, values[-1]])
+            
+    def rob_cond(self, values=(None, None)):
+        
+        if values[0]!=None:
+            self.robc.append([0, values[0]])
+        if values[-1]!=None:
+            self.robc.append([self.nnx-1, values[-1]])
+    
+    def plotmesh(self):
+
+        plt.scatter(self.nodes, np.zeros(len(self.nodes)), color='blue')
+        
+        
+        if len(self.dirbc)>0:
+            plt.scatter(self.nodes[np.array(self.dirbc)[:,0]], np.zeros(len(self.dirbc)), color='red')
+
+        
+        if len(self.neubc)>0:
+            plt.scatter(self.nodes[np.array(self.neubc)[:,0]], np.zeros(len(self.neubc)), color='yellow')
+
+        
+        if len(self.robc)>0:
+            for n, val in self.robc:
+                plt.scatter(self.nodes[n], np.zeros(len(self.robc)), color='orange')
+        
+        
+        
+        plt.show()
+    
+    def ph(self, x):
+        
+        if self.interp=='linear':
+            
+            return np.array([1.-x , x])
+        
+        elif self.interp=='quadratic':
+            
+            return np.array([2.*x**2 -3.*x+1. ,
+                             -4.*x**2 +4.*x ,
+                             2.*x**2 -x])
+        
+        elif self.interp=='cubic':
+            
+            return np.array([2.*x**3 -3.*x**2 +1. ,
+                             x**3 -2.*x**2 +x ,
+                             -2.*x**3 +3.*x**2 ,
+                             x**3 -x**2])
+    
+    def phd(self, x):
+        
+        if self.interp=='linear':
+        
+            return np.array([-1., 1.])
+        
+        elif self.interp=='quadratic':
+            
+            return np.array([4.*x -3. ,
+                             -8.*x +4 ,
+                             4.*x -1.])
+        
+        elif self.interp=='cubic':
+            
+            return np.array([6.*x**2 -6.*x ,
+                             3.*x**2 -4.*x +1. ,
+                             -6.*x**2 +6.*x ,
+                             3.*x**2 -2.*x])
+        
+    
+    def abfind(self, nel, ngp):
+        
+        if self.interp=='linear':
+            
+            self.ngp=1
+                   
+        elif self.interp=='quadratic':
+            
+            self.ngp=3
+        
+        elif self.interp=='cubic':
+            
+            self.ngp=5
+        
+        if ngp!=None:
+            
+            self.ngp=ngp
+            
+        if self.ngp==1:
+            
+            w=[1.]
+            gp=[0.5]
+            
+        elif self.ngp==2:
+            
+            w=[0.5, 0.5]
+            gp=[0.2115, 0.7885]
+        
+        elif self.ngp==3:
+            
+            w=[0.278, 0.4445, 0.278]
+            gp=[0.1125, 0.5, 0.8875]
+        
+        elif self.ngp==4:
+            
+            w=[0.174, 0.326, 0.326, 0.174]
+            gp=[0.0695, 0.33, 0.67, 0.9305]
+        
+        elif self.ngp==5:
+            
+            w=[0.1185, 0.2395, 0.2845, 0.2395, 0.1185]
+            gp=[0.047, 0.231, 0.5, 0.769, 0.953]
+        
+        
+        a2 = self.par[0]
+        a1 = self.par[1]
+        func  = self.par[2]
+        
+        utest = self.soltest
+        
+        #   loop over gauss points
+        for p in range(len(gp)):
+            
+            x=0.
+            x1=0.
+            
+            def f(ut):
+                u=0.           
+                for n in range(self.nn_el):
+                    u=u+utest[self.nop(n,nel)]*ph[n]
+                    
+                return func(u)
+            
+            def df_du(ut):
+                from autograd import grad
+                grd = []
+                
+                for i in range(len(ut)):
+                    grd.append(grad(f,i))
+                    
+                return grd[0](ut)
+            
+            ph = self.ph(gp[p])
+            phd = self.phd(gp[p])
+            
+            for n in range(self.nn_el):
+                
+                x=x+self.nodes[self.nop(n,nel)]*ph[n]
+                x1=x1+self.nodes[self.nop(n,nel)]*phd[n] # dx / dξ
+            
+            phx = phd/x1
+            
+            for m in range(self.nn_el):
+                
+                m1=self.nop(m, nel)
+                
+                for n in range(self.nn_el):
+                    
+                    n1=self.nop(n, nel)
+                    
+                    self.Jac[m1,n1]+=(
+                                       - a2*w[p]*x1*phx[m]*phx[n]
+                                       + a1*w[p]*x1*ph[m] *phx[n]
+                                       + w[p]*x1*ph[m] * df_du(utest)[n]
+                                       )
+                    
+                    self.Rit[m1]+=(
+                                    - a2*w[p]*x1*phx[m]*phx[n]*utest[n1]
+                                    + a1*w[p]*x1*ph[m] *phx[n]*utest[n1]
+                                    )
+                self.Rit[m1]+=  + w[p]*x1*ph[m] * f(utest)
+                                
+    
+    def axb(self, ngp=None):
+        
+        self.Jac=np.zeros((self.nnx,self.nnx))
+        self.Rit=np.zeros(self.nnx)
+        
+        for nel in range(len(self.elements)):
+            
+            self.abfind(nel, ngp)
+        
+        
+        a2 = self.par[0]
+        a1 = self.par[1]
+        f  = self.par[2]
+        
+        
+        # Dirichlet BC
+        
+        for node, value in self.dirbc:
+            
+            self.Jac[node]=0.
+            
+            self.Jac[node, node]=1.
+            
+            self.Rit[node]=self.soltest[node]-value
+        
+        # Neumann BC
+        
+        for node, value in self.neubc:
+            
+            if node==0:
+                self.Rit[node]+= - a2 * value
+                
+            if node==(self.nnx-1):
+                
+                self.Rit[node]+= + a2 * value
+                
+        # Robin BC     not done
+        
+        # for node, values in self.robc:
+            
+        #     rob1, rob0 = values # Robin condition would be   du/dx = rob1 u + rob0
+            
+        #     if node==0:
+        #         self.A[node,node]=self.A[node,node] - a2 * rob1
+        #         self.b[node]=self.b[node] + a2 * rob0
+                
+        #     if node==(self.nnx-1):
+        #         self.A[node,node]=self.A[node,node] + a2 * rob1
+        #         self.b[node]=self.b[node] - a2 * rob0
+            
+    def solve(self, max_it=100, epsilon=10**(-4), ngp=None):
+        
+        conv = False
+        iteration=0
+        
+        while(conv==False and iteration<100):
+            
+            self.axb(ngp)
+
+            du = np.linalg.solve(self.Jac, -self.Rit)
+            
+            self.soltest += du
+            
+            if iteration>0:
+                if np.sqrt(np.mean((self.soltest-self.prevtest)**2))<epsilon:
+                    conv=True
+                    break
+            
+            self.prevtest=np.copy(self.soltest)
+            iteration+=1
+            
+        if conv==True:   
+            self.solution=self.soltest
+            print(f'Solved after {iteration} iterations')
+            print(f'RMSE for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+        else:
+            self.solution=None
+            print(f'Not converging in {iteration} iterations')
+            print(f'RMSE for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+        
+    
+    def dsol_dx(self):
+        
+        try:
+            
+            return self.sol_deriv
+        
+        except:
+            
+            der=np.zeros_like(self.solution)
+            
+            for nel in range(len(self.elements)):
+                
+                for n in range(self.nn_el):
+                    xloc=self.nodes[self.nop(n, nel)]-self.nodes[self.nop(0, nel)]
+                    xloc=xloc/(self.nodes[self.nop((self.nn_el-1), nel)]-self.nodes[self.nop(0, nel)])
+                    phd=self.phd(xloc) 
+                    x1=0
+                    
+                    for k in range(self.nn_el):
+                        
+                        x1=x1+self.nodes[self.nop(k,nel)]*phd[k] # dx / dξ
+                    
+                    phx = phd/x1
+                    
+                    for m in range(self.nn_el):
+                        
+                        der[self.nop(n, nel)] += self.solution[self.nop(m, nel)] * phx[m]
+            
+            for nel in range(len(self.elements)-1):
+                
+                der[self.nop(self.nn_el-1, nel)] = der[self.nop(self.nn_el-1, nel)]/2
+            
+            self.sol_deriv=der
+            
+            return der
+    
+    def reset(self):
+        
+        self.dirbc=[]
+        self.neubc=[]
+        self.robc=[]
+        
+        self.A=np.zeros((self.nnx,self.nnx))
+        self.b=np.zeros(self.nnx)
+        
+        del self.solution
+        del self.sol_deriv
+        
+    def refine(self, r):
+        
+        self.nex=int(round(r*self.nex))
+        self.nnx=(self.nn_el-1)*self.nex+1
+        self.nodes=np.linspace(self.domain[0], self.domain[1], num=(self.nnx))
+        self.elements=[]
+        for i in range(self.nex):
+            temp=[]
+            for j in range(self.nn_el):
+                temp.append(i*(self.nn_el-1)+j)              
+            self.elements.append(tuple(temp))
+        
+        self.reset()
