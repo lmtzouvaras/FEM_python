@@ -89,7 +89,7 @@ class FEM_1D:
                 plt.scatter(self.nodes[n], np.zeros(len(self.robc)), color='orange')
         
         
-        
+        plt.title(f'Discretization for {len(self.elements)} elements, {self.interp} basis functions')
         plt.show()
     
     def ph(self, x):
