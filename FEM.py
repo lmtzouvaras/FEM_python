@@ -1423,9 +1423,9 @@ class FEM_1D_nl:
         self.neubc=[]
         self.robc=[]
         
-        self.soltest=np.zeros(self.nnx)
+        #self.soltest=np.zeros(self.nnx)
         #self.soltest=np.ones(self.nnx)
-        #self.soltest=np.random.rand(self.nnx)
+        self.soltest=np.random.rand(self.nnx)
         
         self.intest=np.copy(self.soltest)
         
@@ -1575,27 +1575,27 @@ class FEM_1D_nl:
         #   loop over gauss points
         for p in range(len(gp)):
             
+            ph = self.ph(gp[p])
+            phd = self.phd(gp[p])
+            
             x=0.
             x1=0.
             
             def f(ut):
                 u=0.           
                 for n in range(self.nn_el):
-                    u=u+utest[self.nop(n,nel)]*ph[n]
-                    
+                    u=u+ut[self.nop(n,nel)]*ph[n]
+                
                 return func(u)
             
             def df_du(ut):
-                from autograd import grad
-                grd = []
+                from autograd import elementwise_grad as grad
+                grd = grad(f)(ut)
                 
-                for i in range(len(ut)):
-                    grd.append(grad(f,i))
-                    
-                return grd[0](ut)
+                #print(grd)
+                return grd
             
-            ph = self.ph(gp[p])
-            phd = self.phd(gp[p])
+            
             
             for n in range(self.nn_el):
                 
@@ -1648,7 +1648,7 @@ class FEM_1D_nl:
             
             self.Jac[node, node]=1.
             
-            self.Rit[node]=self.soltest[node]-value
+            self.Rit[node]=np.copy(self.soltest[node])-value
         
         # Neumann BC
         
@@ -1677,6 +1677,8 @@ class FEM_1D_nl:
             
     def solve(self, max_it=100, epsilon=10**(-4), ngp=None):
         
+        self.intest=np.copy(self.soltest)
+        
         conv = False
         iteration=0
         
@@ -1697,13 +1699,163 @@ class FEM_1D_nl:
             iteration+=1
             
         if conv==True:   
-            self.solution=self.soltest
+            self.solution=np.copy(self.soltest)
             print(f'Solved after {iteration} iterations')
-            print(f'RMSE for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+            print(f'RMS for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+            self.last_sol=np.copy(self.soltest)
+            self.last_its_needed=iteration
         else:
             self.solution=None
             print(f'Not converging in {iteration} iterations')
-            print(f'RMSE for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+            print(f'RMS for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+    
+    
+    def solve_par_cont(self, par, max_it=100, epsilon=10**(-4), ngp=None):
+        
+        self.intest=np.copy(self.soltest)
+        import types
+        from functools import partial
+        
+        if isinstance(self.par[2], partial):
+            original_function = self.par[2].func  # Extract the underlying function
+        else:
+            original_function = self.par[2]
+
+        # Create an independent copy of the function
+        func_par = types.FunctionType(
+            original_function.__code__,  # Use the code object of the underlying function
+            original_function.__globals__,  # Use the same global namespace
+            name=original_function.__name__,  # Copy the name of the function
+            argdefs=original_function.__defaults__,  # Copy the default arguments
+            closure=original_function.__closure__  # Copy the closure (if any)
+            )
+        
+
+        self.par[2]=partial(self.par[2], par=par)
+        
+        conv = False
+        iteration=0
+        
+        while(conv==False and iteration<100):
+            
+            self.axb(ngp)
+
+            du = np.linalg.solve(self.Jac, -self.Rit)
+            
+            self.soltest += du
+            
+            if iteration>0:
+                if np.sqrt(np.mean((self.soltest-self.prevtest)**2))<epsilon:
+                    conv=True
+                    break
+            
+            self.prevtest=np.copy(self.soltest)
+            iteration+=1
+            
+        if conv==True:   
+            self.solution=np.copy(self.soltest)
+            print(f'Solved after {iteration} iterations')
+            print(f'RMS for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+            self.last_sol=np.copy(self.soltest)
+            self.last_its_needed=iteration
+        else:
+            self.solution=None
+            print(f'Not converging in {iteration} iterations')
+            print(f'RMS for Residuals is {np.sqrt(np.mean((self.Rit)**2))}')
+        
+        res=np.zeros(self.nnx)
+        
+        for nel in range(len(self.elements)):
+            
+            if self.interp=='linear':
+                
+                self.ngp=1
+                       
+            elif self.interp=='quadratic':
+                
+                self.ngp=3
+            
+            elif self.interp=='cubic':
+                
+                self.ngp=5
+            
+            if ngp!=None:
+                
+                self.ngp=ngp
+                
+            if self.ngp==1:
+                
+                w=[1.]
+                gp=[0.5]
+                
+            elif self.ngp==2:
+                
+                w=[0.5, 0.5]
+                gp=[0.2115, 0.7885]
+            
+            elif self.ngp==3:
+                
+                w=[0.278, 0.4445, 0.278]
+                gp=[0.1125, 0.5, 0.8875]
+            
+            elif self.ngp==4:
+                
+                w=[0.174, 0.326, 0.326, 0.174]
+                gp=[0.0695, 0.33, 0.67, 0.9305]
+            
+            elif self.ngp==5:
+                
+                w=[0.1185, 0.2395, 0.2845, 0.2395, 0.1185]
+                gp=[0.047, 0.231, 0.5, 0.769, 0.953]
+            
+            
+            a2 = self.par[0]
+            a1 = self.par[1]
+
+            func  = func_par
+            
+            utest = np.copy(self.soltest)
+            
+            #   loop over gauss points
+            for p in range(len(gp)):
+                
+                ph = self.ph(gp[p])
+                phd = self.phd(gp[p])
+                
+                x=0.
+                x1=0.
+                
+                def f(par):
+                    u=0.           
+                    for n in range(self.nn_el):
+                        u=u+utest[self.nop(n,nel)]*ph[n]
+                    
+                    return func(u,par)
+                
+                def df_du(par):
+                    from autograd import grad
+                    from functools import partial
+                    grd = grad(f)(par)
+                    
+                    #print(grd)
+                    return grd
+                
+                
+                for n in range(self.nn_el):
+                    
+                    x=x+self.nodes[self.nop(n,nel)]*ph[n]
+                    x1=x1+self.nodes[self.nop(n,nel)]*phd[n] # dx / dξ
+                
+                phx = phd/x1
+                
+                for m in range(self.nn_el):
+                    
+                    m1=self.nop(m, nel)
+                    
+                    res[m1]= res[m1]  + w[p]*x1*ph[m] * df_du(par)
+        
+        self.dR_dpar= res
+
         
     
     def dsol_dx(self):
